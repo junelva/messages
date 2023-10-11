@@ -1,16 +1,14 @@
-// app.rs
+// messages app.rs
 //
 
+use crossterm::style::{Color, SetForegroundColor};
+use crossterm::{cursor, event, style, terminal, QueueableCommand};
 use rand::{thread_rng, Rng};
+use std::io::{self, Error, Write};
 use std::time::SystemTime;
 use std::{thread, time::Duration};
-use std::io::{self, Error, Write};
-use crossterm::style::{Color, SetForegroundColor};
-use crossterm::{
-    QueueableCommand, terminal, cursor, style, event, 
-};
 
-const MSG: &'static [&'static str] = &[
+const MSG: &[&str] = &[
     "you are beautiful",
     "you are loved",
     "you are lovable",
@@ -53,7 +51,7 @@ const MSG: &'static [&'static str] = &[
     "you are safe",
 ];
 
-const COLORS: &'static [&'static Color] = &[
+const COLORS: &[&Color] = &[
     &Color::Magenta,
     &Color::DarkMagenta,
     &Color::Cyan,
@@ -67,6 +65,7 @@ const COLORS: &'static [&'static Color] = &[
 ];
 
 #[allow(dead_code)]
+#[derive(Debug, Copy, Clone)]
 struct BoxTheme<'a> {
     ul: &'a str,
     ll: &'a str,
@@ -78,7 +77,7 @@ struct BoxTheme<'a> {
 }
 
 #[allow(dead_code)]
-const BOX_ROUND: &'static BoxTheme = &BoxTheme {
+const BOX_ROUND: &BoxTheme = &BoxTheme {
     ul: "╭",
     ll: "╰",
     ur: "╮",
@@ -89,7 +88,7 @@ const BOX_ROUND: &'static BoxTheme = &BoxTheme {
 };
 
 #[allow(dead_code)]
-const BOX_REGULAR: &'static BoxTheme = &BoxTheme {
+const BOX_REGULAR: &BoxTheme = &BoxTheme {
     ul: "┌",
     ll: "└",
     ur: "┐",
@@ -100,7 +99,7 @@ const BOX_REGULAR: &'static BoxTheme = &BoxTheme {
 };
 
 #[allow(dead_code)]
-const BOX_BOLD: &'static BoxTheme = &BoxTheme {
+const BOX_BOLD: &BoxTheme = &BoxTheme {
     ul: "┏",
     ll: "┗",
     ur: "┓",
@@ -111,7 +110,7 @@ const BOX_BOLD: &'static BoxTheme = &BoxTheme {
 };
 
 #[allow(dead_code)]
-const BOX_DOUBLE: &'static BoxTheme = &BoxTheme {
+const BOX_DOUBLE: &BoxTheme = &BoxTheme {
     ul: "╔",
     ll: "╚",
     ur: "╗",
@@ -121,12 +120,7 @@ const BOX_DOUBLE: &'static BoxTheme = &BoxTheme {
     ee: " ",
 };
 
-const BOX_THEMES: &'static [&BoxTheme] = &[
-    BOX_REGULAR,
-    BOX_BOLD,
-    BOX_DOUBLE,
-    BOX_ROUND,
-];
+const BOX_THEMES: &[&BoxTheme] = &[BOX_REGULAR, BOX_BOLD, BOX_DOUBLE, BOX_ROUND];
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Coordinate {
@@ -147,46 +141,48 @@ struct Region {
     wh: Coordinate,
     msg: usize,
     color: Color,
+    box_theme: usize,
     needs_draw: bool,
 }
 
 #[derive(Debug)]
 pub struct App {
-    time_start: SystemTime, 
+    time_start: SystemTime,
     time: u64,
     r: Vec<Region>,
 }
 
 impl App {
     pub fn new() -> Result<App, Error> {
-       let app = App {
-           time_start: SystemTime::now(),
-           time: 0,
-           r: vec![],
-       }; 
+        let app = App {
+            time_start: SystemTime::now(),
+            time: 0,
+            r: vec![],
+        };
 
-       terminal::enable_raw_mode()?;
-       io::stdout()
-           .queue(cursor::Hide)?
-           .queue(cursor::SavePosition)?
-           .queue(terminal::EnterAlternateScreen)?
-           .queue(event::EnableMouseCapture)?
-           .queue(terminal::Clear(terminal::ClearType::All))?
-           .flush()?; 
-       Ok(app)
+        terminal::enable_raw_mode()?;
+        io::stdout()
+            .queue(cursor::Hide)?
+            .queue(cursor::SavePosition)?
+            .queue(terminal::EnterAlternateScreen)?
+            .queue(event::EnableMouseCapture)?
+            .queue(terminal::Clear(terminal::ClearType::All))?
+            .flush()?;
+        Ok(app)
     }
-    
+
     pub fn debug_print(&mut self, text: &str) -> Result<(), Error> {
         io::stdout()
             .queue(cursor::MoveTo(0, 0))?
             .queue(style::Print(text))?;
         Ok(())
     }
+
     pub fn rand_inside(&mut self) -> (u16, u16) {
         let sz = terminal::size().unwrap();
-        return (
-            thread_rng().gen_range((0)..(sz.0)),
-            thread_rng().gen_range((0)..(sz.1)),
+        (
+            thread_rng().gen_range(0..(sz.0)),
+            thread_rng().gen_range(0..(sz.1)),
         )
     }
 
@@ -200,31 +196,41 @@ impl App {
         let sz = terminal::size().unwrap();
         let msg_index = thread_rng().gen_range(0..MSG.len());
         let msg_len = MSG[msg_index as usize].len();
-        let wh = Coordinate {x: (msg_len + 4) as u16, y: 5};
+        let wh = Coordinate {
+            x: (msg_len + 4) as u16,
+            y: 5,
+        };
         let ul = Coordinate {
-            x: if (ul_init.0 + wh.x/2) > sz.0 {
-                    sz.0 - wh.x/2
-               } else if (ul_init.0 as i16 - wh.x as i16 / 2) < 0 {
-                    0 + wh.x/2 
-               } else { ul_init.0 },
-            y: if (ul_init.1 + wh.y/2) >= sz.1 {
-                    sz.1 - 1 - wh.y/2 
-               } else if (ul_init.1 as i16 - wh.y as i16 / 2) < 0 {
-                   0 + wh.y/2
-               } else { ul_init.1 },
+            x: if (ul_init.0 + wh.x / 2) > sz.0 {
+                sz.0 - wh.x / 2
+            } else if (ul_init.0 as i16 - wh.x as i16 / 2) < 0 {
+                wh.x / 2
+            } else {
+                ul_init.0
+            },
+            y: if (ul_init.1 + wh.y / 2) >= sz.1 {
+                sz.1 - 1 - wh.y / 2
+            } else if (ul_init.1 as i16 - wh.y as i16 / 2) < 0 {
+                wh.y / 2
+            } else {
+                ul_init.1
+            },
         };
 
         let col_index = thread_rng().gen_range(0..COLORS.len());
         let color = COLORS[col_index];
 
+        let theme_index = thread_rng().gen_range(0..BOX_THEMES.len());
+
         self.r.push(Region {
-            ul: Coordinate {x: ul.x, y: ul.y},
-            wh: Coordinate {x: wh.x, y: wh.y},
+            ul: Coordinate { x: ul.x, y: ul.y },
+            wh: Coordinate { x: wh.x, y: wh.y },
             msg: msg_index,
             color: *color,
+            box_theme: theme_index,
             needs_draw: true,
         });
-        self.prune_old_regions(30);
+        self.prune_old_regions(12);
 
         Ok(())
     }
@@ -232,39 +238,45 @@ impl App {
     pub fn get_time(&self) -> u64 {
         self.time
     }
-   
+
     fn draw_popup(&self, r: &Region) -> Result<(), Error> {
         io::stdout().queue(SetForegroundColor(r.color))?;
-        
-        let theme_index = thread_rng().gen_range(0..BOX_THEMES.len());
-        let theme = BOX_THEMES[theme_index];
 
+        let theme = BOX_THEMES[r.box_theme];
         let w = r.wh.x - 1;
         let h = r.wh.y - 1;
         for y in 0..r.wh.y {
             for x in 0..r.wh.x {
-                let s =
-                    if      (x, y) == (0, 0) { theme.ul }
-                    else if (x, y) == (0, h) { theme.ll }
-                    else if (x, y) == (w, 0) { theme.ur }
-                    else if (x, y) == (w, h) { theme.lr }
-                    else if x == 0 || x == w { theme.sv }
-                    else if y == 0 || y == h { theme.sh }
-                    else { theme.ee };
-                io::stdout() 
+                let s = if (x, y) == (0, 0) {
+                    theme.ul
+                } else if (x, y) == (0, h) {
+                    theme.ll
+                } else if (x, y) == (w, 0) {
+                    theme.ur
+                } else if (x, y) == (w, h) {
+                    theme.lr
+                } else if x == 0 || x == w {
+                    theme.sv
+                } else if y == 0 || y == h {
+                    theme.sh
+                } else {
+                    theme.ee
+                };
+                io::stdout()
                     .queue(cursor::MoveTo(
-                            r.ul.x + x - r.wh.x / 2,
-                            r.ul.y + y - r.wh.y / 2))?
+                        r.ul.x + x - r.wh.x / 2,
+                        r.ul.y + y - r.wh.y / 2,
+                    ))?
                     .queue(style::Print(s))?;
             }
         }
-        
+
         let tpos = Coordinate {
             x: r.ul.x - ((r.wh.x - 4) / 2),
             y: r.ul.y,
         };
 
-        let s = MSG[r.msg as usize];
+        let s = MSG[r.msg];
         io::stdout()
             .queue(cursor::MoveTo(tpos.x, tpos.y))?
             .queue(style::Print(s))?;
@@ -274,13 +286,19 @@ impl App {
 
     fn update_time(&mut self) -> Result<(), Error> {
         self.time = SystemTime::now()
-            .duration_since(self.time_start).unwrap()
+            .duration_since(self.time_start)
+            .unwrap()
             .as_millis() as u64;
         Ok(())
     }
 
     pub fn update(&mut self) -> Result<(), Error> {
         self.update_time()?;
+        Ok(())
+    }
+
+    pub fn clear(&self) -> Result<(), Error> {
+        io::stdout().queue(terminal::Clear(terminal::ClearType::All))?;
         Ok(())
     }
 
@@ -294,17 +312,7 @@ impl App {
         io::stdout().flush()?;
         Ok(())
     }
-    
-    pub fn apply_filter(&self) -> Result<(), Error> {
-        // first step is to get the current buffer.
-        // this needs to contain foreground character, position, bg color, fg color.
-        
 
-
-        Ok(())
-    }
-
-    #[allow(dead_code)]
     pub fn sleep(&self, ms: u64) {
         thread::sleep(Duration::from_millis(ms));
     }
@@ -320,4 +328,3 @@ impl App {
         Ok(())
     }
 }
-
