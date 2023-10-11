@@ -162,9 +162,9 @@ impl App {
 
         terminal::enable_raw_mode()?;
         io::stdout()
+            .queue(terminal::EnterAlternateScreen)?
             .queue(cursor::Hide)?
             .queue(cursor::SavePosition)?
-            .queue(terminal::EnterAlternateScreen)?
             .queue(event::EnableMouseCapture)?
             .queue(terminal::Clear(terminal::ClearType::All))?
             .flush()?;
@@ -321,8 +321,8 @@ impl App {
         terminal::disable_raw_mode()?;
         io::stdout()
             .queue(event::DisableMouseCapture)?
-            .queue(terminal::LeaveAlternateScreen)?
             .queue(cursor::RestorePosition)?
+            .queue(terminal::LeaveAlternateScreen)?
             .queue(cursor::Show)?
             .flush()?;
         Ok(())

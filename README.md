@@ -2,6 +2,8 @@
 
 `messages` is a minimal terminal screensaver that outputs positive messages to your terminal.
 
+![screenshot](messages.png)
+
 #### installation
 
 you will need [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html). then, from within the `messages` folder after cloning this repository:
