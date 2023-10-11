@@ -2,7 +2,7 @@
 //
 
 use crossterm::style::{Color, SetForegroundColor};
-use crossterm::{cursor, event, style, terminal, QueueableCommand};
+use crossterm::{cursor, style, terminal, QueueableCommand};
 use rand::{thread_rng, Rng};
 use std::io::{self, Error, Write};
 use std::time::SystemTime;
@@ -165,7 +165,6 @@ impl App {
             .queue(terminal::EnterAlternateScreen)?
             .queue(cursor::Hide)?
             .queue(cursor::SavePosition)?
-            .queue(event::EnableMouseCapture)?
             .queue(terminal::Clear(terminal::ClearType::All))?
             .flush()?;
         Ok(app)
@@ -320,7 +319,6 @@ impl App {
     pub fn exit(&self) -> Result<(), Error> {
         terminal::disable_raw_mode()?;
         io::stdout()
-            .queue(event::DisableMouseCapture)?
             .queue(cursor::RestorePosition)?
             .queue(terminal::LeaveAlternateScreen)?
             .queue(cursor::Show)?
